@@ -1,14 +1,14 @@
-"""Corner Lamp/Plant Shelf — Parametric two-level corner shelf for Bambu A1 Mini (180mm bed).
+"""Corner Lamp/Plant Shelf — Single-piece shelves with arch brackets for Bambu A1 Mini.
 
-Upper shelf (lamp): 280mm radius quarter circle, split into 4 tiles.
-Lower shelf (plant): 170mm radius quarter circle, single piece.
-Cable crescent at the corner of the upper shelf for the lamp cord.
-Triangular wall brackets for mounting.
+OuXean mini lamp: 109x109x79mm, 350g.
+Both shelves fit as single pieces on the 180mm bed.
+Arch brackets with gradual curve and screw holes at the bottom.
 """
 
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import cadquery as cq
@@ -49,52 +49,60 @@ def make_shelf(radius: float, thick: float, lip_h: float, lip_w: float) -> cq.Wo
 
 
 def cut_cable_slot(body: cq.Workplane, r: float) -> cq.Workplane:
-    """Cut semicircle cable passthrough at the corner (origin)."""
-    cutter = cq.Workplane("XY").circle(r).extrude(500).translate((0, 0, -250))
-    return body.cut(cutter)
+    """Cut cable passthrough at the corner (origin)."""
+    return body.cut(cq.Workplane("XY").circle(r).extrude(500).translate((0, 0, -250)))
 
 
 # ---------------------------------------------------------------------------
-# Tile splitting
+# Arch bracket
 # ---------------------------------------------------------------------------
 
-def split_tiles(body: cq.Workplane, radius: float) -> list[tuple[str, cq.Workplane]]:
-    """Split shelf into 2x2 grid tiles that each fit on the printer bed."""
-    h = radius / 2
-    grid = {"corner": (0, 0), "right": (1, 0), "top": (0, 1), "outer": (1, 1)}
-    out = []
-    for name, (c, r) in grid.items():
-        clip = (
-            cq.Workplane("XY")
-            .box(h + 0.02, h + 0.02, 500)
-            .translate((c * h + h / 2, r * h + h / 2, 0))
-        )
-        piece = body.intersect(clip)
-        if piece.val().Volume() > 1:
-            out.append((name, piece))
-    return out
+def make_arch_bracket(
+    depth: float,
+    height: float,
+    thick: float,
+    width: float,
+    screw_d: float,
+) -> cq.Workplane:
+    """Arch-shaped wall bracket with smooth curve and screw holes at the bottom.
 
+    Profile is an L-shape where the inner corner is a gradual arch instead of a
+    sharp angle. Vertical face (x=0) mounts to the wall. Shelf rests on top
+    face (y=height). Screw holes are near the bottom of the wall section.
 
-# ---------------------------------------------------------------------------
-# Bracket
-# ---------------------------------------------------------------------------
+    Orientation when mounted:
+        Y = vertical (up the wall)
+        X = horizontal (into the room)
+        Z = along the wall (bracket width)
+    """
+    # Midpoint for the arch curve (parametric quarter-ellipse at 45 degrees)
+    t = math.pi / 4
+    mid_x = thick + (depth - thick) * math.sin(t)
+    mid_y = (height - thick) * (1 - math.cos(t))
 
-def make_bracket(depth: float, height: float, width: float, screw_d: float) -> cq.Workplane:
-    """Triangular wall bracket. Vertical face (x=0) screws to wall, shelf rests on y=0 face."""
-    tri = (
+    # 2D profile: outer L-shape with arched inner contour
+    profile = (
         cq.Workplane("XY")
-        .polyline([(0, 0), (depth, 0), (0, height)])
-        .close()
+        .moveTo(0, 0)
+        .lineTo(thick, 0)                                          # inner wall base
+        .threePointArc((mid_x, mid_y), (depth, height - thick))    # arch curve
+        .lineTo(depth, height)                                     # shelf outer edge
+        .lineTo(0, height)                                         # shelf top to wall
+        .close()                                                   # wall outer face
         .extrude(width)
     )
-    # Screw hole through the wall face at 60% height, centered in width
-    hole = (
-        cq.Workplane("YZ")
-        .center(height * 0.6, width / 2)
-        .circle(screw_d / 2)
-        .extrude(depth)
-    )
-    return tri.cut(hole)
+
+    # Screw holes through the wall face near the bottom
+    for y_pos in [12, height * 0.45]:
+        hole = (
+            cq.Workplane("YZ")
+            .center(y_pos, width / 2)
+            .circle(screw_d / 2)
+            .extrude(depth)
+        )
+        profile = profile.cut(hole)
+
+    return profile
 
 
 # ---------------------------------------------------------------------------
@@ -111,45 +119,36 @@ def save(wp: cq.Workplane, name: str) -> None:
 
 def main() -> None:
     STL.mkdir(parents=True, exist_ok=True)
-    bed = P["printer_bed_mm"]
 
     # --- Upper shelf (lamp) ---
     print("Upper shelf (lamp):")
     upper = make_shelf(P["upper_radius_mm"], P["thickness_mm"], P["lip_height_mm"], P["lip_width_mm"])
     upper = cut_cable_slot(upper, P["cable_slot_radius_mm"])
-
-    if P["upper_radius_mm"] / 2 <= bed:
-        for name, tile in split_tiles(upper, P["upper_radius_mm"]):
-            save(tile, f"upper_{name}.stl")
-    else:
-        save(upper, "upper_shelf.stl")
+    save(upper, "upper_shelf.stl")
 
     # --- Lower shelf (plant) ---
     print("\nLower shelf (plant):")
     lower = make_shelf(P["lower_radius_mm"], P["thickness_mm"], P["lip_height_mm"], P["lip_width_mm"])
+    save(lower, "lower_shelf.stl")
 
-    if P["lower_radius_mm"] <= bed:
-        save(lower, "lower_shelf.stl")
-    else:
-        for name, tile in split_tiles(lower, P["lower_radius_mm"]):
-            save(tile, f"lower_{name}.stl")
-
-    # --- Brackets ---
-    print("\nBrackets:")
-    b = make_bracket(
-        P["bracket_depth_mm"], P["bracket_height_mm"],
-        P["bracket_width_mm"], P["screw_diameter_mm"],
+    # --- Arch brackets ---
+    print("\nArch brackets:")
+    bracket = make_arch_bracket(
+        P["bracket_depth_mm"],
+        P["bracket_height_mm"],
+        P["bracket_thickness_mm"],
+        P["bracket_width_mm"],
+        P["screw_diameter_mm"],
     )
-    save(b, "bracket_x4.stl")
+    save(bracket, "arch_bracket_x4.stl")
 
     # --- Summary ---
-    print(f"\nAll STLs exported to {STL.relative_to(HERE)}/")
-    upper_tiles = split_tiles(upper, P["upper_radius_mm"])
+    print(f"\nAll STLs in {STL.relative_to(HERE)}/")
     print("Print list:")
-    print(f"  {len(upper_tiles)}x upper shelf tiles (glue together)")
-    if P["lower_radius_mm"] <= bed:
-        print("  1x lower_shelf.stl")
-    print("  4x bracket_x4.stl (2 per shelf level, 1 per wall)")
+    print("  1x upper_shelf.stl")
+    print("  1x lower_shelf.stl")
+    print("  4x arch_bracket_x4.stl (2 per level, 1 per wall)")
+    print("  Total: 6 prints")
 
 
 if __name__ == "__main__":
