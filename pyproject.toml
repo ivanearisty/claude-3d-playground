@@ -1,0 +1,82 @@
+[project]
+name = "claude-3d-playground"
+version = "0.1.0"
+description = "3D printing playground — design, validate, and slice 3D models with Claude Code"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "cadquery>=2.4.0",
+    "solidpython2>=2.1.0",
+    "trimesh>=4.0.0",
+    "numpy-stl>=3.1.0",
+    "numpy>=1.24.0",
+    "scipy>=1.11.0",
+    "manifold3d>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "commitizen>=4.1.0",
+    "mypy>=1.17.0",
+    "pre-commit>=4.0.0",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "ruff>=0.12.7",
+]
+
+[tool.ruff]
+line-length = 130
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "D203",
+  "D213",
+  "S101",
+]
+per-file-ignores = { "**/test_*.py" = ["TRY300", "BLE001", "ANN401", "SLF001", "E501", "S105", "ARG001", "ARG002", "S106", "INP001", "PLC0415", "D102", "PLR2004", "D104"], "**/tests/**/__init__.py" = ["D104"], "examples/*.py" = ["INP001", "T201"] }
+
+[tool.mypy]
+strict = true
+explicit_package_bases = true
+mypy_path = ["src"]
+ignore_missing_imports = false
+warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = [
+    "cadquery.*",
+    "solid2.*",
+    "stl.*",
+    "trimesh.*",
+    "OCP.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]
+testpaths = ["tests"]
+addopts = ["--cov", "--cov-report=term-missing", "--import-mode=importlib"]
+markers = [
+    "unit: marks tests as unit tests (fast, isolated)",
+    "integration: marks tests as integration tests (requires OpenSCAD or other tools)",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+fail_under = 50
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+tag_format = "v$version"
+allowed_prefixes = ["Merge", "Revert", "Initial"]
