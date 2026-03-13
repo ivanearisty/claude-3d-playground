@@ -1,14 +1,15 @@
 {
-    "upper_radius_mm": 170,
-    "lower_radius_mm": 170,
-    "thickness_mm": 6,
+    "shelf_radius_mm": 170,
+    "shelf_thickness_mm": 6,
     "lip_height_mm": 8,
     "lip_width_mm": 3,
     "cable_slot_radius_mm": 10,
-    "bracket_depth_mm": 50,
-    "bracket_height_mm": 50,
-    "bracket_thickness_mm": 8,
+    "bracket_depth_mm": 60,
+    "bracket_height_mm": 80,
+    "bracket_min_thickness_mm": 15,
     "bracket_width_mm": 25,
     "screw_diameter_mm": 4.2,
+    "boss_diameter_mm": 12,
+    "boss_protrusion_mm": 3,
     "printer_bed_mm": 180
 }
